@@ -52,7 +52,7 @@ use fields (
 
 use URI;
 use MIME::Base64 ();
-use Digest::SHA1 qw(sha1 sha1_hex);
+use Digest::SHA qw(sha1 sha1_hex sha256 sha256_hex hmac_sha256_hex);
 use Crypt::DH 0.05;
 use Math::BigInt;
 use Time::Local qw(timegm);
@@ -432,7 +432,7 @@ sub _generate_association {
     my $type = delete $opts{type};
     my $dumb = delete $opts{dumb} || 0;
     Carp::croak("Unknown options: " . join(", ", keys %opts)) if %opts;
-    die unless $type eq "HMAC-SHA1";
+    die unless $type =~ /^HMAC-SHA(1|256)$/;
 
     my $now = time();
     my $sec_time = $now - ($now % $self->secret_gen_interval);
@@ -444,9 +444,14 @@ sub _generate_association {
     $nonce = "STLS.$nonce" if $dumb;  # flag nonce as stateless
 
     my $handle = "$now:$nonce";
-    $handle .= ":" . substr(hmac_sha1_hex($handle, $s_sec), 0, 10);
+    if ($type eq 'HMAC-SHA1') {
+        $handle .= ":" . substr(hmac_sha1_hex($handle, $s_sec), 0, 10);
+    }
+    elsif ($type eq 'HMAC-SHA256') {
+        $handle .= ":" . substr(hmac_sha256_hex($handle, $s_sec), 0, 10);
+    }
 
-    my $c_sec = $self->_secret_of_handle($handle, dumb => $dumb)
+    my $c_sec = $self->_secret_of_handle($handle, dumb => $dumb, type=>$type)
         or return ();
 
     my $expires = $sec_time + $self->secret_expire_age;
@@ -459,6 +464,12 @@ sub _secret_of_handle {
 
     my $dumb_mode = delete $opts{'dumb'}      || 0;
     my $no_verify = delete $opts{'no_verify'} || 0;
+    my $type = delete $opts{'type'} || 'HMAC-SHA1';
+    my %hmac_functions=(
+                   'HMAC-SHA1'  =>\&hmac_sha1_hex,
+                   'MMAC-SHA256'=>\&hmac_sha256_hex,
+                  );
+    my $hmac_function=$hmac_functions{$type} || Carp::croak "No function for $type";
     Carp::croak("Unknown options: " . join(", ", keys %opts)) if %opts;
 
     my ($time, $nonce, $nonce_sig80) = split(/:/, $handle);
@@ -475,7 +486,7 @@ sub _secret_of_handle {
     length($nonce)       == ($dumb_mode ? 25 : 20) or return;
     length($nonce_sig80) == 10                     or return;
 
-    return unless $no_verify || $nonce_sig80 eq substr(hmac_sha1_hex("$time:$nonce", $s_sec), 0, 10);
+    return unless $no_verify || $nonce_sig80 eq substr(&$hmac_function("$time:$nonce", $s_sec), 0, 10);
 
     return hmac_sha1($handle, $s_sec);
 }
@@ -486,11 +497,8 @@ sub _mode_associate {
     my $now = time();
     my %prop;
 
-    my $assoc_type = "HMAC-SHA1";
-    # FUTURE: protocol will let people choose their preferred authn scheme,
-    # in which case we see if we support any of them, and override the
-    # default value of HMAC-SHA1
-    
+    my $assoc_type = $self->message('assoc_type') || "HMAC-SHA1";
+
     if ($self->message('ns') eq $OPENID2_NS &&
         ($self->message('assoc_type') ne $assoc_type ||
         $self->message('session_type') ne 'DH-SHA1')) {
@@ -523,7 +531,7 @@ sub _mode_associate {
         $prop{'issued'}   = _time_to_w3c($now);
     }
 
-    if ($self->args("openid.session_type") eq "DH-SHA1") {
+    if ($self->args("openid.session_type") =~ /^DH-SHA(1|256)$/) {
 
         my $dh   = Crypt::DH->new;
         my $p    = _arg2bi($self->args("openid.dh_modulus")) || _default_p();
@@ -540,8 +548,13 @@ sub _mode_associate {
         my $dh_sec = $dh->compute_secret($cpub);
 
         $prop{'dh_server_public'} = _bi2arg($dh->pub_key);
-        $prop{'session_type'}     = "DH-SHA1";
-        $prop{'enc_mac_key'}      = _b64($secret ^ sha1(_bi2bytes($dh_sec)));
+        $prop{'session_type'}     = $self->message("session_type");
+        if ($self->args("openid.session_type") eq 'DH-SHA1') {
+            $prop{'enc_mac_key'}      = _b64($secret ^ sha1(_bi2bytes($dh_sec)));
+        }
+        elsif ($self->args("openid.session_type") eq 'DH-SHA256') {
+            $prop{'enc_mac_key'}      = _b64($secret ^ sha256(_bi2bytes($dh_sec)));
+        }
 
     } else {
         $prop{'mac_key'} = _b64($secret);

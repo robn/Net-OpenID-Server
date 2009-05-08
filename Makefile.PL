@@ -4,7 +4,7 @@ WriteMakefile( 'NAME' => 'Net::OpenID::Server',
                'PREREQ_PM' => {
                    'URI'            => 0,
                    'MIME::Base64'   => 0,
-                   'Digest::SHA1'   => 0,
+                   'Digest::SHA'    => 0,
                    'Crypt::DH'      => 0.05,
                },
                ($] >= 5.005 ?
