@@ -365,6 +365,8 @@ sub _mode_checkid {
 
     if ($mode eq "checkid_immediate") {
         my $ret_url = $return_to;
+        _push_url_arg(\$setup_url, 'openid.mode'=>'checkid_setup');
+        _push_url_arg(\$setup_url, 'openid.claimed_id'=>$identity);
         if ($self->args('openid.ns') eq $OPENID2_NS) {
             _push_url_arg(\$ret_url, "openid.ns",             $self->args('openid.ns'));
             _push_url_arg(\$ret_url, "openid.mode",           "setup_needed");
