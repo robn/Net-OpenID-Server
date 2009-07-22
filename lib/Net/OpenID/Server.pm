@@ -467,7 +467,7 @@ sub _secret_of_handle {
     my $type = delete $opts{'type'} || 'HMAC-SHA1';
     my %hmac_functions=(
                    'HMAC-SHA1'  =>\&hmac_sha1_hex,
-                   'MMAC-SHA256'=>\&hmac_sha256_hex,
+                   'HMAC-SHA256'=>\&hmac_sha256_hex,
                   );
     my $hmac_function=$hmac_functions{$type} || Carp::croak "No function for $type";
     Carp::croak("Unknown options: " . join(", ", keys %opts)) if %opts;
