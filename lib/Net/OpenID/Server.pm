@@ -368,7 +368,7 @@ sub _mode_checkid {
                       $self->_setup_map("return_to"),    $return_to,
                       $self->_setup_map("identity"),     $identity,
                       $self->_setup_map("assoc_handle"), $self->args("openid.assoc_handle"),
-                      $self->_setup_map("assoc_type"),   $self->args("openid.assoc_type"),
+                      $self->_setup_map("assoc_type"),   $self->_determine_assoc_type_from_assoc_handle($self->args("openid.assoc_handle")),
                       );
     $setup_args{$self->_setup_map('ns')} = $self->args('openid.ns') if $self->args('openid.ns');
 
@@ -398,6 +398,26 @@ sub _mode_checkid {
             return ("setup", \%setup_args);
         }
     }
+}
+
+sub _determine_assoc_type_from_assoc_handle {
+    my ($self, $assoc_handle)=@_;
+
+    my $assoc_type=$self->args("openid.assoc_type");
+    return $assoc_type if ($assoc_type); # set? Just return it.
+
+    if ($assoc_handle) {
+        my (undef, undef, $hmac_part)=split /:/, $assoc_handle, 3;
+        my $len=length($hmac_part); # see _generate_association
+        if ($len==16) {
+            $assoc_type='HMAC-SHA256';
+        }
+        elsif ($len==10) {
+            $assoc_type='HMAC-SHA1';
+        }
+    }
+
+    return $assoc_type;
 }
 
 sub _setup_map {
@@ -460,7 +480,7 @@ sub _generate_association {
         $handle .= ":" . substr(hmac_sha1_hex($handle, $s_sec), 0, 10);
     }
     elsif ($type eq 'HMAC-SHA256') {
-        $handle .= ":" . substr(hmac_sha256_hex($handle, $s_sec), 0, 10);
+        $handle .= ":" . substr(hmac_sha256_hex($handle, $s_sec), 0, 16);
     }
 
     my $c_sec = $self->_secret_of_handle($handle, dumb => $dumb, type=>$type)
@@ -485,6 +505,11 @@ sub _secret_of_handle {
                    'HMAC-SHA1'  =>\&hmac_sha1,
                    'HMAC-SHA256'=>\&hmac_sha256,
                   );
+    my %nonce_80_lengths=(
+                          'HMAC-SHA1'=>10,
+                          'HMAC-SHA256'=>16,
+                         );
+    my $nonce_80_len=$nonce_80_lengths{$type};
     my $hmac_function_hex=$hmac_functions_hex{$type} || Carp::croak "No function for $type";
     my $hmac_function=$hmac_functions{$type} || Carp::croak "No function for $type";
     Carp::croak("Unknown options: " . join(", ", keys %opts)) if %opts;
@@ -501,9 +526,9 @@ sub _secret_of_handle {
     my $s_sec = $self->_get_server_secret($sec_time)  or return;
 
     length($nonce)       == ($dumb_mode ? 25 : 20) or return;
-    length($nonce_sig80) == 10                     or return;
+    length($nonce_sig80) == $nonce_80_len          or return;
 
-    return unless $no_verify || $nonce_sig80 eq substr($hmac_function_hex->("$time:$nonce", $s_sec), 0, 10);
+    return unless $no_verify || $nonce_sig80 eq substr($hmac_function_hex->("$time:$nonce", $s_sec), 0, $nonce_80_len);
 
     return $hmac_function->($handle, $s_sec);
 }
