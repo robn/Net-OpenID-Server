@@ -52,7 +52,7 @@ use fields (
 
 use URI;
 use MIME::Base64 ();
-use Digest::SHA qw(sha1 sha1_hex sha256 sha256_hex hmac_sha256_hex);
+use Digest::SHA qw(sha1 sha1_hex sha256 sha256_hex hmac_sha256 hmac_sha256_hex);
 use Crypt::DH 0.05;
 use Math::BigInt;
 use Time::Local qw(timegm);
@@ -213,6 +213,7 @@ sub signed_return_url {
     my $claimed_id   = delete $opts{'claimed_id'};
     my $return_to    = delete $opts{'return_to'};
     my $assoc_handle = delete $opts{'assoc_handle'};
+    my $assoc_type   = delete $opts{'assoc_type'} || 'HMAC-SHA1';
     my $ns           = delete $opts{'ns'};
     my $extra_fields = delete $opts{'additional_fields'} || {};
 
@@ -231,7 +232,7 @@ sub signed_return_url {
     my $invalid_handle;
 
     if ($assoc_handle) {
-        $c_sec = $self->_secret_of_handle($assoc_handle);
+        $c_sec = $self->_secret_of_handle($assoc_handle, type=>$assoc_type);
 
         # tell the consumer that their provided handle is bogus
         # (or we forgot it) and that they should stop using it
@@ -240,13 +241,13 @@ sub signed_return_url {
 
     unless ($c_sec) {
         # dumb consumer mode
-        ($assoc_handle, $c_sec, undef) = $self->_generate_association(type => "HMAC-SHA1",
+        ($assoc_handle, $c_sec, undef) = $self->_generate_association(type => $assoc_type,
                                                                       dumb => 1);
     }
 
     $claimed_id ||= $identity;
     $claimed_id = $identity if $claimed_id eq $OPENID2_ID_SELECT;
-    my @sign = qw(mode claimed_id identity op_endpoint return_to response_nonce assoc_handle);
+    my @sign = qw(mode claimed_id identity op_endpoint return_to response_nonce assoc_handle assoc_type);
 
     my $now = time();
     my %arg = (
@@ -255,6 +256,7 @@ sub signed_return_url {
                claimed_id     => $claimed_id,
                return_to      => $return_to,
                assoc_handle   => $assoc_handle,
+               assoc_type     => $assoc_type,
                response_nonce => _time_to_w3c($now) . _rand_chars(6),
                );
     $arg{'op_endpoint'} = $self->endpoint_url if $self->endpoint_url && $self->args('openid.ns') eq $OPENID2_NS;
@@ -298,7 +300,15 @@ sub signed_return_url {
     }
 
     # finally include the signature
-    push @arg, "openid.sig" => _b64(hmac_sha1($token_contents, $c_sec));
+    if ($assoc_type eq 'HMAC-SHA1') {
+        push @arg, "openid.sig" => _b64(hmac_sha1($token_contents, $c_sec));
+    }
+    elsif ($assoc_type eq 'HMAC-SHA256') {
+        push @arg, "openid.sig" => _b64(hmac_sha256($token_contents, $c_sec));
+    }
+    else {
+        die "Unknown assoc_type $assoc_type";
+    }
 
     _push_url_arg(\$ret_url, @arg);
     return $ret_url;
@@ -342,6 +352,7 @@ sub _mode_checkid {
                                                claimed_id => $self->args('openid.claimed_id'),
                                                return_to => $return_to,
                                                assoc_handle => $self->args("openid.assoc_handle"),
+                                               assoc_type => $self->args("openid.assoc_type"),
                                                ns => $self->args('openid.ns'),
                                                );
         return ("redirect", $ret_url);
@@ -357,6 +368,7 @@ sub _mode_checkid {
                       $self->_setup_map("return_to"),    $return_to,
                       $self->_setup_map("identity"),     $identity,
                       $self->_setup_map("assoc_handle"), $self->args("openid.assoc_handle"),
+                      $self->_setup_map("assoc_type"),   $self->args("openid.assoc_type"),
                       );
     $setup_args{$self->_setup_map('ns')} = $self->args('openid.ns') if $self->args('openid.ns');
 
@@ -465,10 +477,15 @@ sub _secret_of_handle {
     my $dumb_mode = delete $opts{'dumb'}      || 0;
     my $no_verify = delete $opts{'no_verify'} || 0;
     my $type = delete $opts{'type'} || 'HMAC-SHA1';
-    my %hmac_functions=(
+    my %hmac_functions_hex=(
                    'HMAC-SHA1'  =>\&hmac_sha1_hex,
                    'HMAC-SHA256'=>\&hmac_sha256_hex,
                   );
+    my %hmac_functions=(
+                   'HMAC-SHA1'  =>\&hmac_sha1,
+                   'HMAC-SHA256'=>\&hmac_sha256,
+                  );
+    my $hmac_function_hex=$hmac_functions_hex{$type} || Carp::croak "No function for $type";
     my $hmac_function=$hmac_functions{$type} || Carp::croak "No function for $type";
     Carp::croak("Unknown options: " . join(", ", keys %opts)) if %opts;
 
@@ -486,9 +503,9 @@ sub _secret_of_handle {
     length($nonce)       == ($dumb_mode ? 25 : 20) or return;
     length($nonce_sig80) == 10                     or return;
 
-    return unless $no_verify || $nonce_sig80 eq substr(&$hmac_function("$time:$nonce", $s_sec), 0, 10);
+    return unless $no_verify || $nonce_sig80 eq substr($hmac_function_hex->("$time:$nonce", $s_sec), 0, 10);
 
-    return hmac_sha1($handle, $s_sec);
+    return $hmac_function->($handle, $s_sec);
 }
 
 sub _mode_associate {
@@ -524,6 +541,7 @@ sub _mode_associate {
     $prop{'ns'}   = $self->args('openid.ns') if $self->args('openid.ns');
     $prop{'assoc_type'}   = $assoc_type;
     $prop{'assoc_handle'} = $assoc_handle;
+    $prop{'assoc_type'}   = $assoc_type;
     $prop{'expires_in'}   = $exp_rel;
 
     if ($self->{compat}) {
@@ -583,7 +601,18 @@ sub _mode_check_authentication {
     my $c_sec = $self->_secret_of_handle($ahandle, dumb => 1)
         or return $self->_error_page("bad_handle");
 
-    my $good_sig = _b64(hmac_sha1($token, $c_sec));
+    my $assoc_type = $self->pargs('openid.assoc_type') || 'HMAC-SHA1';
+
+    my $good_sig;
+    if ($assoc_type eq 'HMAC-SHA1') {
+        $good_sig = _b64(hmac_sha1($token, $c_sec));
+    }
+    elsif ($assoc_type eq 'HMAC-SHA256') {
+        $good_sig = _b64(hmac_sha256($token, $c_sec));
+    }
+    else {
+        die "Unknown assoc_type $assoc_type";
+    }
 
     my $is_valid = $sig eq $good_sig;
 
