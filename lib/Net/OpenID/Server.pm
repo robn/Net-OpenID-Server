@@ -572,7 +572,7 @@ sub _mode_check_authentication {
 
     my $good_sig = _b64(hmac_sha1($token, $c_sec));
 
-    my $is_valid = $sig eq $good_sig;
+    my $is_valid = OpenID::util::timing_indep_eq($sig, $good_sig);
 
     my $ret = {
         is_valid => $is_valid ? "true" : "false",
