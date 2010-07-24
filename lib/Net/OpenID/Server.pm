@@ -865,8 +865,7 @@ Net::OpenID::Server - library for building your own OpenID server
   use Net::OpenID::Server;
 
   my $nos = Net::OpenID::Server->new(
-    get_args     => $cgi,
-    post_args    => $cgi,
+    args         => $cgi,
     get_user     => \&get_user,
     get_identity => \&get_identity,
     is_identity  => \&is_identity,
@@ -908,9 +907,9 @@ As of version 1.01 this module has support for both OpenID 1.1 and
 =item Net::OpenID::Server->B<new>([ %opts ])
 
 You can set anything in the constructor options that there are
-getters/setters methods for below.  That includes: get_args,
-post_args, get_user, is_identity, is_trusted, setup_url, and
-setup_map.  See below for docs.
+getters/setters methods for below.  That includes: args, get_user,
+is_identity, is_trusted, setup_url, and setup_map.  See below for
+docs.
 
 =back
 
@@ -1016,23 +1015,13 @@ Required.  The base of the URL being generated.
 
 =back
 
-=item $nos->B<get_args>($ref)
-
-=item $nos->B<get_args>($param)
-
-=item $nos->B<get_args>
-
-=item $nos->B<post_args>($ref)
-
-=item $nos->B<post_args>($param)
-
-=item $nos->B<post_args>
+=item $nos->B<args>
 
 Can be used in 1 of 3 ways:
 
-1. Setting the way which the Server instances obtains GET parameters:
+1. Setting the way which the Server instances obtains parameters:
 
-$nos->get_args( $reference )
+$nos->args( $reference )
 
 Where $reference is either a HASH ref, CODE ref, Apache $r (for
 get_args only), Apache::Request $apreq, or CGI.pm $cgi.  If a CODE
