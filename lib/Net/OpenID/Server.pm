@@ -626,7 +626,7 @@ sub _mode_check_authentication {
     my $c_sec = $self->_secret_of_handle($ahandle, dumb => 1)
         or return $self->_error_page("bad_handle");
 
-    my $assoc_type = $self->pargs('openid.assoc_type') || 'HMAC-SHA1';
+    my $assoc_type = $self->args('openid.assoc_type') || 'HMAC-SHA1';
 
     my $good_sig;
     if ($assoc_type eq 'HMAC-SHA1') {
