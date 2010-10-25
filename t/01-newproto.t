@@ -4,7 +4,8 @@ use strict;
 use Test::More tests => 150;
 use Data::Dumper;
 use Net::OpenID::Server;
-use Crypt::DH;
+use Math::BigInt;
+use Crypt::DH::GMP;
 use Digest::SHA1 qw(sha1 sha1_hex);
 
 for (my $num=1; $num <= 2000; $num += 20) {
@@ -69,7 +70,7 @@ sub assoc_clear {
 
 # DH associate
 sub assoc_dh {
-    my $dh = Crypt::DH->new;
+    my $dh = Crypt::DH::GMP->new;
     ok($dh, 'Instantiated Crypt::DH (the next step will take a while...)');
     $dh->p("155172898181473697471232257763715539915724801966915404479707795314057629378541917580651227423698188993727816152646631438561595825688188889951272158842675419950341258706556549803580104870537681476726513255747040765857479291291572334510643245094715007229621094194349783925984760375594985848253359305585439638443");
     $dh->g("2");

@@ -53,7 +53,7 @@ use fields (
 use URI;
 use MIME::Base64 ();
 use Digest::SHA qw(sha1 sha1_hex sha256 sha256_hex hmac_sha256 hmac_sha256_hex);
-use Crypt::DH 0.05;
+use Crypt::DH::GMP;
 use Math::BigInt;
 use Time::Local qw(timegm);
 
@@ -578,7 +578,7 @@ sub _mode_associate {
 
     if ($self->args("openid.session_type") =~ /^DH-SHA(1|256)$/) {
 
-        my $dh   = Crypt::DH->new;
+        my $dh   = Crypt::DH::GMP->new;
         my $p    = _arg2bi($self->args("openid.dh_modulus")) || _default_p();
         my $g    = _arg2bi($self->args("openid.dh_gen"))     || _default_g();
         my $cpub = _arg2bi($self->args("openid.dh_consumer_public"));
