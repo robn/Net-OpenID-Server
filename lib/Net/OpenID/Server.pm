@@ -2,7 +2,7 @@
 
 use strict;
 use Carp ();
-use lib "../Net-OpenID-Common/lib";
+use Net::OpenID::Common;
 use Net::OpenID::IndirectMessage;
 
 ############################################################################
@@ -199,7 +199,7 @@ sub cancel_return_url {
     Carp::croak("Unknown options: " . join(", ", keys %opts)) if %opts;
 
     my $ret_url = $return_to;
-    _push_url_arg(\$ret_url, "openid.mode" => "cancel");
+    OpenID::util::push_url_arg(\$ret_url, "openid.mode" => "cancel");
     return $ret_url;
 }
 
@@ -254,7 +254,7 @@ sub signed_return_url {
                return_to      => $return_to,
                assoc_handle   => $assoc_handle,
                assoc_type     => $assoc_type,
-               response_nonce => _time_to_w3c($now) . _rand_chars(6),
+               response_nonce => OpenID::util::time_to_w3c($now) . _rand_chars(6),
                );
     $arg{'op_endpoint'} = $self->endpoint_url if $self->endpoint_url && $ns eq $OPENID2_NS;
     $arg{'ns'} = $ns if $ns;
@@ -262,8 +262,8 @@ sub signed_return_url {
     # compatibility mode with version 1.0 of the protocol which still
     # had absolute dates
     if ($self->{compat}) {
-        $arg{issued}   = _time_to_w3c($now);
-        $arg{valid_to} = _time_to_w3c($now + 3600);
+        $arg{issued}   = OpenID::util::time_to_w3c($now);
+        $arg{valid_to} = OpenID::util::time_to_w3c($now + 3600);
         push @sign, "issued", "valid_to";
     }
 
@@ -298,16 +298,16 @@ sub signed_return_url {
 
     # finally include the signature
     if ($assoc_type eq 'HMAC-SHA1') {
-        push @arg, "openid.sig" => _b64(hmac_sha1($token_contents, $c_sec));
+        push @arg, "openid.sig" => OpenID::util::b64(hmac_sha1($token_contents, $c_sec));
     }
     elsif ($assoc_type eq 'HMAC-SHA256') {
-        push @arg, "openid.sig" => _b64(hmac_sha256($token_contents, $c_sec));
+        push @arg, "openid.sig" => OpenID::util::b64(hmac_sha256($token_contents, $c_sec));
     }
     else {
         die "Unknown assoc_type $assoc_type";
     }
 
-    _push_url_arg(\$ret_url, @arg);
+    OpenID::util::push_url_arg(\$ret_url, @arg);
     return $ret_url;
 }
 
@@ -370,22 +370,22 @@ sub _mode_checkid {
     $setup_args{$self->_setup_map('ns')} = $self->args('openid.ns') if $self->args('openid.ns');
 
     my $setup_url = $self->{setup_url} or Carp::croak("No setup_url defined.");
-    _push_url_arg(\$setup_url, %setup_args);
+    OpenID::util::push_url_arg(\$setup_url, %setup_args);
 
     if ($mode eq "checkid_immediate") {
         my $ret_url = $return_to;
-        _push_url_arg(\$setup_url, 'openid.mode'=>'checkid_setup');
-        _push_url_arg(\$setup_url, 'openid.claimed_id'=>$identity);
+        OpenID::util::push_url_arg(\$setup_url, 'openid.mode'=>'checkid_setup');
+        OpenID::util::push_url_arg(\$setup_url, 'openid.claimed_id'=>$identity);
         if ($self->args('openid.ns') eq $OPENID2_NS) {
-            _push_url_arg(\$ret_url, "openid.ns",             $self->args('openid.ns'));
-            _push_url_arg(\$ret_url, "openid.mode",           "setup_needed");
+            OpenID::util::push_url_arg(\$ret_url, "openid.ns",             $self->args('openid.ns'));
+            OpenID::util::push_url_arg(\$ret_url, "openid.mode",           "setup_needed");
         } else {
-            _push_url_arg(\$ret_url, "openid.mode",           "id_res");
+            OpenID::util::push_url_arg(\$ret_url, "openid.mode",           "id_res");
         }
         # We send this even in the 2.0 case -- despite what the spec says --
         # because several consumer implementations, including Net::OpenID::Consumer
         # at this time, depend on it.
-        _push_url_arg(\$ret_url, "openid.user_setup_url", $setup_url);
+        OpenID::util::push_url_arg(\$ret_url, "openid.user_setup_url", $setup_url);
         return ("redirect", $ret_url);
     } else {
         # the "checkid_setup" mode, where we take control of the user-agent
@@ -569,16 +569,16 @@ sub _mode_associate {
     $prop{'expires_in'}   = $exp_rel;
 
     if ($self->{compat}) {
-        $prop{'expiry'}   = _time_to_w3c($exp_abs);
-        $prop{'issued'}   = _time_to_w3c($now);
+        $prop{'expiry'}   = OpenID::util::time_to_w3c($exp_abs);
+        $prop{'issued'}   = OpenID::util::time_to_w3c($now);
     }
 
     if ($self->args("openid.session_type") =~ /^DH-SHA(1|256)$/) {
 
         my $dh   = Crypt::DH::GMP->new;
-        my $p    = _arg2bi($self->args("openid.dh_modulus")) || _default_p();
-        my $g    = _arg2bi($self->args("openid.dh_gen"))     || _default_g();
-        my $cpub = _arg2bi($self->args("openid.dh_consumer_public"));
+        my $p    = OpenID::util::arg2bi($self->args("openid.dh_modulus")) || _default_p();
+        my $g    = OpenID::util::arg2bi($self->args("openid.dh_gen"))     || _default_g();
+        my $cpub = OpenID::util::arg2bi($self->args("openid.dh_consumer_public"));
 
         return $self->_error_page("invalid dh params p=$p, g=$g, cpub=$cpub")
             unless $p > 10 && $g > 1 && $cpub;
@@ -589,17 +589,17 @@ sub _mode_associate {
 
         my $dh_sec = $dh->compute_secret($cpub);
 
-        $prop{'dh_server_public'} = _bi2arg($dh->pub_key);
+        $prop{'dh_server_public'} = OpenID::util::bi2arg($dh->pub_key);
         $prop{'session_type'}     = $self->message("session_type");
         if ($self->args("openid.session_type") eq 'DH-SHA1') {
-            $prop{'enc_mac_key'}      = _b64($secret ^ sha1(_bi2bytes($dh_sec)));
+            $prop{'enc_mac_key'}      = OpenID::util::b64($secret ^ sha1(OpenID::util::bi2bytes($dh_sec)));
         }
         elsif ($self->args("openid.session_type") eq 'DH-SHA256') {
-            $prop{'enc_mac_key'}      = _b64($secret ^ sha256(_bi2bytes($dh_sec)));
+            $prop{'enc_mac_key'}      = OpenID::util::b64($secret ^ sha256(OpenID::util::bi2bytes($dh_sec)));
         }
 
     } else {
-        $prop{'mac_key'} = _b64($secret);
+        $prop{'mac_key'} = OpenID::util::b64($secret);
     }
 
     return $self->_serialized_props(\%prop);
@@ -629,10 +629,10 @@ sub _mode_check_authentication {
 
     my $good_sig;
     if ($assoc_type eq 'HMAC-SHA1') {
-        $good_sig = _b64(hmac_sha1($token, $c_sec));
+        $good_sig = OpenID::util::b64(hmac_sha1($token, $c_sec));
     }
     elsif ($assoc_type eq 'HMAC-SHA256') {
-        $good_sig = _b64(hmac_sha256($token, $c_sec));
+        $good_sig = OpenID::util::b64(hmac_sha256($token, $c_sec));
     }
     else {
         die "Unknown assoc_type $assoc_type";
@@ -660,12 +660,6 @@ sub _mode_check_authentication {
     }
 
     return $self->_serialized_props($ret);
-}
-
-sub _b64 {
-    my $val = MIME::Base64::encode_base64($_[0]);
-    $val =~ s/\s+//g;
-    return $val;
 }
 
 sub _error_page {
@@ -809,73 +803,6 @@ sub _url_is_under {
     return $err->("path not a subpath") unless $tu_path =~ m!^\Q$ru_path\E!;
 
     return 1;
-}
-
-sub _time_to_w3c {
-    my $time = shift || time();
-    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = gmtime($time);
-    $mon++;
-    $year += 1900;
-
-    return sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ",
-                   $year, $mon, $mday,
-                   $hour, $min, $sec);
-}
-
-sub _w3c_to_time {
-    my $hms = shift;
-    return 0 unless
-        $hms =~ /^(\d{4,4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)Z$/;
-
-    my $time;
-    eval {
-        $time = timegm($6, $5, $4, $3, $2 - 1, $1);
-    };
-    return 0 if $@;
-    return $time;
-}
-
-sub _push_url_arg {
-    my $uref = shift;
-    $$uref =~ s/[&?]$//;
-    my $got_qmark = ($$uref =~ /\?/);
-
-    while (@_) {
-        my $key = shift;
-        my $value = shift;
-        $$uref .= $got_qmark ? "&" : ($got_qmark = 1, "?");
-        $$uref .= _eurl($key) . "=" . _eurl($value);
-    }
-}
-
-sub _bi2bytes {
-    my $bigint = shift;
-    die "Can't deal with negative numbers" if $bigint->is_negative;
-
-    my $bits = $bigint->as_bin;
-    die unless $bits =~ s/^0b//;
-
-    # prepend zeros to round to byte boundary, or to unset high bit
-    my $prepend = (8 - length($bits) % 8) || ($bits =~ /^1/ ? 8 : 0);
-    $bits = ("0" x $prepend) . $bits if $prepend;
-
-    return pack("B*", $bits);
-}
-
-sub _bi2arg {
-    return _b64(_bi2bytes($_[0]));
-}
-
-sub _bytes2bi {
-    return Math::BigInt->new("0b" . unpack("B*", $_[0]));
-}
-
-sub _arg2bi {
-    return undef unless defined $_[0] && $_[0] ne "";
-    # don't acccept base-64 encoded numbers over 700 bytes.  which means
-    # those over 4200 bits.
-    return Math::BigInt->new("0") if length($_[0]) > 700;
-    return _bytes2bi(MIME::Base64::decode_base64($_[0]));
 }
 
 sub _default_p {
