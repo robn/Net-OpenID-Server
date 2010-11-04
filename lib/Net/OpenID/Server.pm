@@ -573,9 +573,9 @@ sub _mode_associate {
 
     if ($self->args("openid.session_type") =~ /^DH-SHA(1|256)$/) {
 
-        my $p    = OpenID::util::arg2bi($self->args("openid.dh_modulus"));
-        my $g    = OpenID::util::arg2bi($self->args("openid.dh_gen"));
-        my $cpub = OpenID::util::arg2bi($self->args("openid.dh_consumer_public"));
+        my $p    = OpenID::util::arg2int($self->args("openid.dh_modulus"));
+        my $g    = OpenID::util::arg2int($self->args("openid.dh_gen"));
+        my $cpub = OpenID::util::arg2int($self->args("openid.dh_consumer_public"));
 
         my $dh = OpenID::util::get_dh($p, $g);
         return $self->_error_page("invalid dh params p=$p, g=$g, cpub=$cpub")
@@ -583,13 +583,13 @@ sub _mode_associate {
 
         my $dh_sec = $dh->compute_secret($cpub);
 
-        $prop{'dh_server_public'} = OpenID::util::bi2arg($dh->pub_key);
+        $prop{'dh_server_public'} = OpenID::util::int2arg($dh->pub_key);
         $prop{'session_type'}     = $self->message("session_type");
         if ($self->args("openid.session_type") eq 'DH-SHA1') {
-            $prop{'enc_mac_key'}      = OpenID::util::b64($secret ^ sha1(OpenID::util::bi2bytes($dh_sec)));
+            $prop{'enc_mac_key'}      = OpenID::util::b64($secret ^ sha1(OpenID::util::int2bytes($dh_sec)));
         }
         elsif ($self->args("openid.session_type") eq 'DH-SHA256') {
-            $prop{'enc_mac_key'}      = OpenID::util::b64($secret ^ sha256(OpenID::util::bi2bytes($dh_sec)));
+            $prop{'enc_mac_key'}      = OpenID::util::b64($secret ^ sha256(OpenID::util::int2bytes($dh_sec)));
         }
 
     } else {
