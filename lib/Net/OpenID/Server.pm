@@ -50,8 +50,6 @@ use fields (
 use URI;
 use MIME::Base64 ();
 use Digest::SHA qw(sha1 sha1_hex sha256 sha256_hex hmac_sha256 hmac_sha256_hex);
-use Crypt::DH::GMP;
-use Math::BigInt;
 use Time::Local qw(timegm);
 
 my $OPENID2_NS = qq!http://specs.openid.net/auth/2.0!;
@@ -575,17 +573,13 @@ sub _mode_associate {
 
     if ($self->args("openid.session_type") =~ /^DH-SHA(1|256)$/) {
 
-        my $dh   = Crypt::DH::GMP->new;
-        my $p    = OpenID::util::arg2bi($self->args("openid.dh_modulus")) || _default_p();
-        my $g    = OpenID::util::arg2bi($self->args("openid.dh_gen"))     || _default_g();
+        my $p    = OpenID::util::arg2bi($self->args("openid.dh_modulus"));
+        my $g    = OpenID::util::arg2bi($self->args("openid.dh_gen"));
         my $cpub = OpenID::util::arg2bi($self->args("openid.dh_consumer_public"));
 
+        my $dh = OpenID::util::get_dh($p, $g);
         return $self->_error_page("invalid dh params p=$p, g=$g, cpub=$cpub")
-            unless $p > 10 && $g > 1 && $cpub;
-
-        $dh->p($p);
-        $dh->g($g);
-        $dh->generate_keys;
+            unless $dh and $cpub;
 
         my $dh_sec = $dh->compute_secret($cpub);
 
@@ -803,14 +797,6 @@ sub _url_is_under {
     return $err->("path not a subpath") unless $tu_path =~ m!^\Q$ru_path\E!;
 
     return 1;
-}
-
-sub _default_p {
-    return Math::BigInt->new("155172898181473697471232257763715539915724801966915404479707795314057629378541917580651227423698188993727816152646631438561595825688188889951272158842675419950341258706556549803580104870537681476726513255747040765857479291291572334510643245094715007229621094194349783925984760375594985848253359305585439638443");
-}
-
-sub _default_g {
-    return Math::BigInt->new("2");
 }
 
 sub _rand_chars
