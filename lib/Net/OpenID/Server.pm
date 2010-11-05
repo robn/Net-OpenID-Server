@@ -47,6 +47,7 @@ use fields (
             'compat',          # version 1.0 compatibility flag (otherwise only sends 1.1 parameters)
             );
 
+use Carp;
 use URI;
 use MIME::Base64 ();
 use Digest::SHA qw(sha1 sha1_hex sha256 sha256_hex hmac_sha1 hmac_sha1_hex hmac_sha256 hmac_sha256_hex);
@@ -63,6 +64,14 @@ sub new {
     $self->{last_errcode} = undef;
     $self->{last_errtext} = undef;
 
+    if (exists $opts{get_args}) {
+        carp "Option 'get_args' is deprecated, use 'args' instead";
+        $self->args(delete $opts{get_args});
+    }
+    if (exists $opts{post_args}) {
+        carp "Option 'post_args' is deprecated, use 'args' instead";
+        $self->args(delete $opts{post_args});
+    }
     $self->args(delete $opts{args});
 
     $opts{'secret_gen_interval'} ||= 86400;

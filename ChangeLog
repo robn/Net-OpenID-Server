@@ -1,4 +1,4 @@
-1.10:
+1.030099_001
 
     * Use Crypt::DH::GMP over Crypt::DH for speed (Robert Norris)
 
@@ -10,6 +10,9 @@
       (see http://lists.openid.net/pipermail/openid-security/2010-July/001156.html)
 
     * Support HMAC-SHA256 signatures (Adam Sjøgren)
+    
+    * Merge get_args and post_args into single 'args' parameter. get_args &
+      post_args remain as deprecated parameters (Martin Atkins, Robert Norris)
 
 1.02:
 
