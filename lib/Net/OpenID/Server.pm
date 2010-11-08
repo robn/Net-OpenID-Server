@@ -828,7 +828,7 @@ __END__
 
 =head1 NAME
 
-Net::OpenID::Server - library for building your own OpenID server
+Net::OpenID::Server - Library for building your own OpenID server
 
 =head1 SYNOPSIS
 
