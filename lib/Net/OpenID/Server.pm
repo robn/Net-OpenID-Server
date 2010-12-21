@@ -371,10 +371,16 @@ sub _mode_checkid {
                       $self->_setup_map("realm"),        $trust_root,
                       $self->_setup_map("return_to"),    $return_to,
                       $self->_setup_map("identity"),     $identity,
-                      $self->_setup_map("assoc_handle"), $self->args("openid.assoc_handle"),
-                      $self->_setup_map("assoc_type"),   $self->_determine_assoc_type_from_assoc_handle($self->args("openid.assoc_handle")),
                       );
     $setup_args{$self->_setup_map('ns')} = $self->args('openid.ns') if $self->args('openid.ns');
+
+    if ( $self->args("openid.assoc_handle") ) {
+        $setup_args{ $self->_setup_map("assoc_handle") } =
+          $self->args("openid.assoc_handle");
+        $setup_args{ $self->_setup_map("assoc_type") } =
+          $self->_determine_assoc_type_from_assoc_handle(
+            $self->args("openid.assoc_handle") );
+    }
 
     my $setup_url = $self->{setup_url} or Carp::croak("No setup_url defined.");
     OpenID::util::push_url_arg(\$setup_url, %setup_args);
