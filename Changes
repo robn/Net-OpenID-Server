@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+    * Made 'assoc_handle' argument optional for indirect requests per
+      http://openid.net/specs/openid-authentication-2_0.html#anchor27
+      (Mario Domgoergen)
+
     * Added example CGI program (Robert Norris)
  
     * Documentation tweaks (Robert Norris)
