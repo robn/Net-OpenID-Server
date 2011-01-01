@@ -764,14 +764,6 @@ sub errtext {
     $self->{last_errtext};
 }
 
-sub _eurl
-{
-    my $a = $_[0];
-    $a =~ s/([^a-zA-Z0-9_\,\-.\/\\\: ])/uc sprintf("%%%02x",ord($1))/eg;
-    $a =~ tr/ /+/;
-    return $a;
-}
-
 # FIXME: duplicated in Net::OpenID::Consumer's VerifiedIdentity
 sub _url_is_under {
     my ($root, $test, $err_ref) = @_;
