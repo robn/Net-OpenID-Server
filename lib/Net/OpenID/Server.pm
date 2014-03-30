@@ -364,7 +364,7 @@ sub _mode_checkid {
 
     # assertion could not be made, so user requires setup (login/trust.. something)
     # two ways that can happen:  caller might have asked us for an immediate return
-    # with a setup URL (the default), or explictly said that we're in control of
+    # with a setup URL (the default), or explicitly said that we're in control of
     # the user-agent's full window, and we can do whatever we want with them now.
     my %setup_args = (
                       $self->_setup_map("trust_root"),   $trust_root,
@@ -996,7 +996,7 @@ get_args only), Apache::Request $apreq, or CGI.pm $cgi.  If a CODE
 ref, the subref must return the value given one argument (the
 parameter to retrieve)
 
-2. Get a paramater:
+2. Get a parameter:
 
 my $foo = $nos->get_args("foo");
 
